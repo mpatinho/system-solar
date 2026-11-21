@@ -1,0 +1,5 @@
+node_modules
+dist
+.git
+*.log
+public/textures/8k_stars_milky_way.jpg.tmp
