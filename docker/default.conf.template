@@ -1,0 +1,34 @@
+# Plantilla de nginx (la imagen oficial sustituye ${HTTPS_PORT} al arrancar).
+# El mando (Gamepad API) solo funciona en páginas seguras: https:// o localhost.
+
+# HTTP desde otro equipo de la red → se redirige a HTTPS (salvo el certificado de la CA).
+server {
+  listen 80 default_server;
+  server_name _;
+  location = /ca.crt {
+    alias /etc/nginx/certs/ca.crt;
+    default_type application/x-x509-ca-cert;
+    add_header Content-Disposition 'attachment; filename="sistema-solar-ca.crt"';
+  }
+  location / {
+    return 301 https://$host:${HTTPS_PORT}$request_uri;
+  }
+}
+
+# HTTP en el propio servidor (localhost ya cuenta como página segura).
+server {
+  listen 80;
+  server_name localhost 127.0.0.1;
+  include /etc/nginx/web.conf;
+}
+
+# HTTPS con el certificado de la CA local (lo crea 40-certificados.sh).
+server {
+  listen 443 ssl;
+  http2 on;
+  server_name _;
+  ssl_certificate /etc/nginx/certs/server.crt;
+  ssl_certificate_key /etc/nginx/certs/server.key;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  include /etc/nginx/web.conf;
+}

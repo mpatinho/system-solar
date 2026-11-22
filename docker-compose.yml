@@ -4,5 +4,16 @@ services:
     image: sistema-solar-explorador
     container_name: sistema-solar
     ports:
-      - "8080:80"
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8444}:443"
+    environment:
+      # Puerto HTTPS visto desde fuera (para redirigir http:// → https://)
+      HTTPS_PORT: "${HTTPS_PORT:-8444}"
+      # Nombres e IP del servidor en la red, separados por comas (p. ej. servidor.local,192.168.1.10)
+      CERT_HOSTS: "${CERT_HOSTS:-}"
+    volumes:
+      - certs:/etc/nginx/certs
     restart: unless-stopped
+
+volumes:
+  certs:

@@ -1,6 +1,7 @@
 // HUD: velocidad, astro cercano, botones, objetivo de misión y flecha hacia el objetivo.
 import * as THREE from 'three';
 import { h } from '../utils/dom.js';
+import { glyph, keyOr } from '../input/gamepad.js';
 
 export function createHud({ onButton }) {
   const root = document.getElementById('hud');
@@ -28,7 +29,9 @@ export function createHud({ onButton }) {
   const nearest = h('div', { class: 'nearest' });
   root.append(h('div', { class: 'hud-bottom' }, speed, nearest));
   root.append(h('div', { class: 'scale-note' }, 'ℹ️ Tamaños y distancias reducidos para poder viajar (los datos de las fichas son los reales)'));
-  const hint = h('div', { class: 'hint' }, h('span', { class: 'kbd' }, 'W'), ' acelerar · ', h('span', { class: 'kbd' }, 'A'), h('span', { class: 'kbd' }, 'D'), ' girar · ', h('span', { class: 'kbd' }, '↑'), h('span', { class: 'kbd' }, '↓'), ' morro · ', h('span', { class: 'kbd' }, 'M'), ' destinos · ', h('span', { class: 'kbd' }, 'H'), ' ayuda');
+  const hint = h('div', { class: 'hint' },
+    h('span', { class: 'kbd-only' }, h('span', { class: 'kbd' }, 'W'), ' acelerar · ', h('span', { class: 'kbd' }, 'A'), h('span', { class: 'kbd' }, 'D'), ' girar · ', h('span', { class: 'kbd' }, '↑'), h('span', { class: 'kbd' }, '↓'), ' morro · ', h('span', { class: 'kbd' }, 'M'), ' destinos · ', h('span', { class: 'kbd' }, 'H'), ' ayuda'),
+    h('span', { class: 'gp-only' }, glyph('RT'), ' acelerar · ', glyph('LS'), ' pilotar · ', glyph('RB'), ' turbo · ', glyph('Y'), ' destinos · ', glyph('START'), ' pausa'));
   root.append(hint);
   root.append(h('div', { class: 'crosshair' }));
 
@@ -45,6 +48,11 @@ export function createHud({ onButton }) {
   root.append(targetBox);
 
   let lastNearest = '';
+  let lastFrac = -1, lastTurbo = false;
+  let arrowShown = false, boxShown = false, lastArrowLabel = '';
+  const showArrow = (on) => { if (on !== arrowShown) { arrowShown = on; arrowWrap.classList.toggle('hidden', !on); } };
+  const showBox = (on) => { if (on !== boxShown) { boxShown = on; targetBox.classList.toggle('hidden', !on); } };
+  const arrowSvg = arrowWrap.querySelector('.arrow');
   const v = new THREE.Vector3();
   const camDir = new THREE.Vector3();
 
@@ -59,9 +67,9 @@ export function createHud({ onButton }) {
     },
     setExtra(...nodes) { extraEl.replaceChildren(...nodes); },
     update({ speed: s, max, turbo, near, autopilot }) {
-      const pct = Math.min(100, (Math.abs(s) / max) * 100);
-      speedFill.style.width = `${pct}%`;
-      speedFill.classList.toggle('turbo', !!turbo);
+      const frac = Math.round(Math.min(1, Math.abs(s) / max) * 200) / 200;
+      if (frac !== lastFrac) { lastFrac = frac; speedFill.style.transform = `scaleX(${frac})`; }
+      if (!!turbo !== lastTurbo) { lastTurbo = !!turbo; speedFill.classList.toggle('turbo', lastTurbo); }
       const label = autopilot ? '⚡ HIPERSALTO' : turbo ? `🔥 TURBO ${Math.round(Math.abs(s) * 1000).toLocaleString('es-ES')} km/s` : `${Math.round(Math.abs(s) * 1000).toLocaleString('es-ES')} km/s`;
       if (speedVal.textContent !== label) speedVal.textContent = label;
       let txt = '';
@@ -71,7 +79,7 @@ export function createHud({ onButton }) {
       }
       if (txt !== lastNearest) {
         lastNearest = txt;
-        nearest.replaceChildren(txt, h('small', null, near?.inZone ? 'Pulsa M para viajar a otro sitio' : 'Acércate para ver su ficha, o pulsa M para un hipersalto'));
+        nearest.replaceChildren(txt, h('small', null, near?.inZone ? ['Pulsa ', keyOr('M', 'Y'), ' para viajar a otro sitio'] : ['Acércate para ver su ficha, o pulsa ', keyOr('M', 'Y'), ' para un hipersalto']));
       }
     },
     setObjective(title, q, sub) {
@@ -84,25 +92,29 @@ export function createHud({ onButton }) {
       if (answerPrompt.dataset.text === text) return;
       answerPrompt.dataset.text = text;
       answerPrompt.classList.remove('hidden');
-      answerPrompt.replaceChildren(h('span', null, text), h('button', { class: 'btn small primary', onclick: onClick }, 'Elegir (E)'));
+      answerPrompt.replaceChildren(h('span', null, text), h('button', { class: 'btn small primary', onclick: onClick }, 'Elegir ', keyOr('E', 'A')));
     },
     // Flecha en el borde de la pantalla o círculo alrededor del objetivo.
     updateTarget(entry, camera, shipPos) {
-      if (!entry) { arrowWrap.classList.add('hidden'); targetBox.classList.add('hidden'); return; }
+      if (!entry) { showArrow(false); showBox(false); return; }
       v.copy(entry.position).project(camera);
       camera.getWorldDirection(camDir);
       const inFront = camDir.dot(v.clone().set(entry.position.x - camera.position.x, entry.position.y - camera.position.y, entry.position.z - camera.position.z)) > 0;
       const onScreen = inFront && Math.abs(v.x) < 0.9 && Math.abs(v.y) < 0.85;
       if (onScreen) {
-        arrowWrap.classList.add('hidden');
-        targetBox.classList.remove('hidden');
+        showArrow(false);
+        showBox(true);
         const x = (v.x * 0.5 + 0.5) * innerWidth, y = (-v.y * 0.5 + 0.5) * innerHeight;
         const fovPx = innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
-        const r = Math.max(18, Math.min(220, (entry.radius / Math.max(0.1, camera.position.distanceTo(entry.position))) * fovPx * 1.25));
-        Object.assign(targetBox.style, { left: `${x - r}px`, top: `${y - r}px`, width: `${r * 2}px`, height: `${r * 2}px` });
+        const r = Math.round(Math.max(18, Math.min(220, (entry.radius / Math.max(0.1, camera.position.distanceTo(entry.position))) * fovPx * 1.25)));
+        if (targetBox.dataset.r !== String(r)) {
+          targetBox.dataset.r = String(r);
+          targetBox.style.width = targetBox.style.height = `${r * 2}px`;
+        }
+        targetBox.style.transform = `translate(${(x - r).toFixed(1)}px, ${(y - r).toFixed(1)}px)`;
       } else {
-        targetBox.classList.add('hidden');
-        arrowWrap.classList.remove('hidden');
+        showBox(false);
+        showArrow(true);
         let dx = v.x, dy = v.y;
         if (!inFront) { dx = -dx; dy = -dy; }
         const a = Math.atan2(dy, dx);
@@ -113,10 +125,10 @@ export function createHud({ onButton }) {
         const sy = Math.sin(a);
         const k = Math.min(mx / Math.abs(Math.cos(a) || 1e-3), (sy > 0 ? myUp : myDown) / Math.abs(sy || 1e-3));
         const x = cx + Math.cos(a) * k, y = cy - sy * k;
-        arrowWrap.style.left = `${x}px`;
-        arrowWrap.style.top = `${y}px`;
-        arrowWrap.querySelector('.arrow').style.transform = `rotate(${-a + Math.PI / 2}rad)`;
-        arrowLabel.textContent = `${entry.body.short || entry.body.name}${inFront ? '' : ' (detrás de ti: gira la nave)'}`;
+        arrowWrap.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+        arrowSvg.style.transform = `rotate(${(-a + Math.PI / 2).toFixed(3)}rad)`;
+        const label = `${entry.body.short || entry.body.name}${inFront ? '' : ' (detrás de ti: gira la nave)'}`;
+        if (label !== lastArrowLabel) { lastArrowLabel = label; arrowLabel.textContent = label; }
       }
     },
   };

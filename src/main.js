@@ -4,8 +4,10 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { state } from './state.js';
 import { progress, save } from './utils/storage.js';
+import { h } from './utils/dom.js';
 import { unlockAudio, updateEngine, silenceEngine, sfx } from './utils/audio.js';
 import { createRenderer } from './scene/renderer.js';
+import { createPerfMonitor } from './scene/perf.js';
 import { createSkybox } from './scene/skybox.js';
 import { createSolarSystem } from './scene/solarSystem.js';
 import { manager } from './scene/textures.js';
@@ -13,30 +15,45 @@ import { createShip } from './ship/ship.js';
 import { ShipControls } from './ship/controls.js';
 import { ChaseCamera } from './ship/camera.js';
 import { Autopilot } from './ship/autopilot.js';
+import { pad } from './input/gamepad.js';
+import { createUiNav } from './input/uiNav.js';
 import { createHud } from './ui/hud.js';
 import { createLabels } from './ui/labels.js';
 import { createFlares } from './ui/flares.js';
 import { createInfoPanel } from './ui/infoPanel.js';
 import { openLesson } from './ui/demos/index.js';
-import { closeTopModal, closeAllModals, modalOpen, toast, flash } from './ui/modal.js';
-import { showMainMenu, openDestinations, openPassport, openStudySheet, openLessonsList, openOptions, openHelp } from './ui/screens.js';
+import { closeTopModal, closeAllModals, modalOpen, topModal, toast, flash } from './ui/modal.js';
+import { showMainMenu, openDestinations, openPassport, openStudySheet, openLessonsList, openOptions, openHelp, openPauseMenu } from './ui/screens.js';
 import { createExploration } from './modes/exploration.js';
 import { createAdventure } from './modes/adventure.js';
 import { runQuiz } from './ui/quiz.js';
 import { QUESTION_BY_ID } from './data/questions.js';
 
 const settings = progress.settings;
+const TIER_NAMES = { alta: 'Alta', media: 'Media', baja: 'Baja' };
 
 // ---------- Escena ----------
 const canvas = document.getElementById('scene');
-const { renderer, scene, camera, applyQuality, render } = createRenderer(canvas, settings.quality);
+const { renderer, scene, camera, applyQuality, render, info: renderInfo, softwareRendering } = createRenderer(canvas);
+const perf = createPerfMonitor({
+  startTier: softwareRendering ? 'baja' : settings.autoTier || 'media',
+  onChange: ({ tier }) => {
+    if (settings.quality !== 'auto') return;
+    settings.autoTier = tier;
+    save();
+    applySettings();
+  },
+});
+const currentTier = () => (settings.quality === 'auto' ? perf.tier : settings.quality);
+
 scene.add(new THREE.AmbientLight(0xbfd4ff, 0.05));
 const pmrem = new THREE.PMREMGenerator(renderer);
 const envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
 const sky = createSkybox(settings.quality);
 scene.add(sky.mesh);
-const system = createSolarSystem(scene, { quality: settings.quality, envMap });
+const system = createSolarSystem(scene, { quality: currentTier(), envMap });
+system.setViewer(camera.position);
 
 const ship = createShip(envMap);
 scene.add(ship.root);
@@ -51,6 +68,9 @@ const labels = createLabels(document.getElementById('labels'), system, camera, (
   if (state.mode !== 'menu' && !modalOpen()) hyperjump(entry.id);
 });
 const flares = createFlares(document.getElementById('flares'), camera, system);
+const uiNav = createUiNav(pad);
+const fpsEl = h('div', { id: 'fps', class: 'hidden', 'aria-hidden': 'true' });
+document.getElementById('app').append(fpsEl);
 
 let target = null;
 const game = {
@@ -67,6 +87,7 @@ function hyperjump(id) {
   if (!entry || autopilot.active) return;
   info.hide();
   sfx.warp();
+  pad.rumble(0.25, 0.6, 350);
   state.autopilot = true;
   autopilot.start(entry, system, () => {
     state.autopilot = false;
@@ -82,18 +103,34 @@ function handleButton(id) {
     case 'pasaporte': openPassport(); break;
     case 'lecciones': openLessonsList(); break;
     case 'chuleta': openStudySheet(); break;
-    case 'opciones': openOptions({ onChange: applySettings }); break;
+    case 'opciones': openOptions({ onChange: applySettings, perfInfo }); break;
     case 'ayuda': openHelp(); break;
     case 'menu': goToMenu(); break;
     default:
   }
 }
 
+function perfInfo() {
+  const i = renderInfo();
+  const fps = perf.fps ? `${Math.round(perf.fps)} fps · ` : '';
+  return `Ahora: ${fps}${i.width}×${i.height} · ${TIER_NAMES[i.tier]}${settings.quality === 'auto' ? ' (automática)' : ''}`;
+}
+
+let applied = '';
 function applySettings() {
-  applyQuality(settings.quality);
+  const tier = currentTier();
+  const scale = settings.quality === 'auto' ? perf.scale : 1;
+  const key = `${tier}|${scale}`;
+  if (key !== applied) {
+    applied = key;
+    applyQuality(tier, scale);
+    system.setQuality(tier);
+    perf.reset();
+  }
   sky.setQuality(settings.quality);
-  system.setQuality(settings.quality);
   system.orbitLines.visible = settings.orbits;
+  controls.invertY = !!settings.invertY;
+  fpsEl.classList.toggle('hidden', !settings.showFps);
 }
 
 // ---------- Posición inicial: junto a la Tierra ----------
@@ -140,6 +177,7 @@ function goToMenu() {
   menuEl = showMainMenu({
     onExplore: () => startMode('explore'),
     onAdventure: () => startMode('adventure'),
+    onOptions: () => openOptions({ onChange: applySettings, perfInfo }),
   });
 }
 
@@ -149,7 +187,7 @@ window.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement) return;
   if (e.code === 'Escape') {
     if (closeTopModal()) return;
-    if (info.currentId) { info.hide(); return; }
+    if (info.currentId) { info.dismiss(); return; }
     return;
   }
   if (state.mode === 'menu' || modalOpen() || e.repeat) return;
@@ -162,6 +200,45 @@ window.addEventListener('keydown', (e) => {
   }
 });
 window.addEventListener('pointerdown', unlockAudio);
+
+// ---------- Mando ----------
+let panelNav = false; // X: el foco entra en la ficha del astro
+function navRoot() {
+  const m = topModal();
+  if (m) return m.el;
+  if (menuEl?.isConnected) return menuEl;
+  if (panelNav && info.el?.isConnected) return info.el;
+  panelNav = false;
+  return null;
+}
+
+// Devuelve true si el mando está manejando un menú (y no la nave).
+function gamepadFrame(dt, inGame) {
+  pad.poll(dt);
+  if (!pad.connected) return false;
+  const root = navRoot();
+  uiNav.update(dt, root, { onBack: root && root === info.el ? () => { panelNav = false; } : undefined });
+  if (root) {
+    if (pad.pressed('A') || pad.pressed('B')) unlockAudio();
+    return true;
+  }
+  if (!inGame) return false;
+  if (pad.pressed('A') || pad.pressed('START')) unlockAudio();
+  if (pad.pressed('START')) { openPauseMenu({ mode: state.mode, onAction: handleButton }); return true; }
+  if (pad.pressed('SELECT')) { openHelp(); return true; }
+  if (pad.pressed('Y') && !autopilot.active) { openDestinations((id) => hyperjump(id)); return true; }
+  if (pad.pressed('A')) mode?.onKey('KeyE');
+  if (pad.pressed('B') && info.currentId) info.dismiss();
+  if (pad.pressed('X')) {
+    if (info.el) panelNav = true;
+    else if (state.mode === 'explore') toast('Acércate a un astro para ver su ficha', '', 1800);
+  }
+  if (pad.pressed('R3')) chase.reset();
+  chase.look(pad.rx, pad.ry, dt);
+  if (pad.held('UP')) chase.zoom(Math.exp(-dt * 1.6));
+  if (pad.held('DOWN')) chase.zoom(Math.exp(dt * 1.6));
+  return false;
+}
 
 // ---------- Colisiones ----------
 let lastWarn = 0;
@@ -184,6 +261,7 @@ function collide(time) {
             : `⚠️ ¡Cuidado! Casi chocas con ${b.short || b.name}.`;
         toast(msg, 'bad', 3200);
         sfx.alarm();
+        pad.rumble(0.9, 0.5, 300);
       }
     }
   }
@@ -192,12 +270,18 @@ function collide(time) {
 // ---------- Bucle principal ----------
 const clock = new THREE.Clock();
 let elapsed = 0;
+let lastRender = -1;
+let fpsTimer = 0;
+let started = false;
 function frame() {
-  const dt = Math.min(0.05, clock.getDelta());
+  const rawDt = clock.getDelta();
+  const dt = Math.min(0.05, rawDt);
   elapsed += dt;
   const inGame = state.mode !== 'menu';
   const timeScale = inGame ? settings.timeScale : 1;
   state.simTime += dt * timeScale;
+
+  const padInMenu = gamepadFrame(dt, inGame);
 
   system.update(state.simTime, dt, elapsed);
   system.orbitLines.visible = settings.orbits;
@@ -213,7 +297,7 @@ function frame() {
   if (ap) {
     power = ap.thrust;
   } else if (inGame) {
-    const c = controls.update(dt);
+    const c = controls.update(dt, padInMenu ? null : pad);
     power = 0.15 + Math.min(1.4, c.throttle * (c.turbo ? 1.5 : 1));
     turbo = c.turbo;
     collide(elapsed);
@@ -235,7 +319,23 @@ function frame() {
     mode?.update(dt);
     updateEngine(ap ? 1 : Math.abs(controls.speed) / controls.maxSpeed, turbo || !!ap);
   }
-  render();
+
+  // Con una ventana abierta delante, la escena se pinta a ~20 fps: la interfaz va más suelta.
+  const throttled = modalOpen();
+  if (!throttled || elapsed - lastRender >= 0.05) {
+    render();
+    lastRender = elapsed;
+  }
+  perf.tick(rawDt, { measure: started && !throttled && !document.hidden, auto: settings.quality === 'auto' });
+
+  if (settings.showFps) {
+    fpsTimer -= dt;
+    if (fpsTimer <= 0) {
+      fpsTimer = 0.5;
+      const i = renderInfo();
+      fpsEl.textContent = `${perf.fps ? Math.round(perf.fps) : '…'} fps · ${i.width}×${i.height} · ${TIER_NAMES[i.tier]}`;
+    }
+  }
   requestAnimationFrame(frame);
 }
 
@@ -246,7 +346,6 @@ manager.onProgress = (url, loaded, total) => {
   progressBar.style.width = `${Math.round((loaded / total) * 100)}%`;
   loadingText.textContent = `Cargando texturas reales de la NASA… ${loaded}/${total}`;
 };
-let started = false;
 function start() {
   if (started) return;
   started = true;
@@ -255,13 +354,17 @@ function start() {
   applySettings();
   document.getElementById('loading').classList.add('done');
   goToMenu();
+  if (softwareRendering) {
+    toast('⚠️ El navegador está dibujando sin la tarjeta gráfica y todo irá lento. Activa la «aceleración por hardware» en su configuración.', 'bad', 9000);
+  }
   // Para depurar desde la consola del navegador
   window.__juego = {
-    system, ship, controls, autopilot, state, hyperjump, startMode, progress, openLesson,
+    system, ship, controls, autopilot, state, hyperjump, startMode, progress, openLesson, pad, perf, renderInfo, chase,
     probarPreguntas: (ids) => runQuiz({ title: 'Prueba', questions: ids.map((id) => QUESTION_BY_ID[id]), shields: 3, onFinish: () => {}, onFly: (q, r) => r(q.answer) }),
   };
 }
 manager.onLoad = start;
 manager.onError = (url) => console.warn('No se pudo cargar', url);
 setTimeout(start, 15000); // por si alguna textura tarda demasiado
+applySettings();
 requestAnimationFrame(frame);

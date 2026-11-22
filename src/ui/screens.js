@@ -7,12 +7,13 @@ import { LESSONS, openLesson } from './demos/index.js';
 import { progress, save, rankFor, resetProgress } from '../utils/storage.js';
 import { setSound } from '../utils/audio.js';
 import { formatNota } from '../utils/dom.js';
+import { glyph } from '../input/gamepad.js';
 
 const ORDER = ['sol', 'mercurio', 'venus', 'tierra', 'luna', 'marte', 'cinturon', 'jupiter', 'saturno', 'urano', 'neptuno', 'pluton', 'cometa', 'voyager'];
 const ordered = () => ORDER.map((id) => BODY_BY_ID[id]);
 
 // ---------- Menú principal ----------
-export function showMainMenu({ onExplore, onAdventure }) {
+export function showMainMenu({ onExplore, onAdventure, onOptions = () => openOptions({}) }) {
   const ui = document.getElementById('ui');
   const visited = Object.keys(progress.visited).length;
   const rank = rankFor(progress.points);
@@ -29,7 +30,7 @@ export function showMainMenu({ onExplore, onAdventure }) {
       h('div', { class: 'menu-row' },
         h('button', { class: 'btn', onclick: () => openStudySheet() }, '📚 Chuleta de estudio'),
         h('button', { class: 'btn', onclick: () => openLessonsList() }, '📖 Lecciones'),
-        h('button', { class: 'btn', onclick: () => openOptions({}) }, '⚙️ Opciones'),
+        h('button', { class: 'btn', onclick: () => onOptions() }, '⚙️ Opciones'),
         h('button', { class: 'btn', onclick: () => openCredits() }, 'ℹ️ Créditos')),
       h('div', { class: 'menu-progress' },
         h('span', null, rank.medal, ' Rango: ', h('b', null, rank.name)),
@@ -150,15 +151,15 @@ export function openLessonsList() {
 }
 
 // ---------- Opciones ----------
-export function openOptions({ onChange = () => {} }) {
+export function openOptions({ onChange = () => {}, perfInfo } = {}) {
   const s = progress.settings;
   const seg = (options, value, set) => {
     const wrap = h('div', { class: 'seg' });
-    const draw = (cur) => wrap.replaceChildren(...options.map(([v, label]) => h('button', { class: v === cur ? 'on' : '', onclick: () => { set(v); save(); draw(v); onChange(); } }, label)));
+    const draw = (cur) => wrap.replaceChildren(...options.map(([v, label]) => h('button', { class: v === cur ? 'on' : '', onclick: (e) => { set(v); save(); draw(v); onChange(); wrap.children[options.findIndex((o) => o[0] === v)]?.focus(); e.stopPropagation(); } }, label)));
     draw(value);
     return wrap;
   };
-  const row = (label, control) => h('div', { class: 'opt-row' }, h('span', null, label), control);
+  const row = (label, control, note) => h('div', { class: 'opt-row' }, h('span', null, label, note ? h('small', { class: 'opt-note' }, note) : null), control);
   let confirmReset = false;
   const resetBtn = h('button', { class: 'btn small', onclick: () => {
     if (!confirmReset) { confirmReset = true; resetBtn.textContent = '¿Seguro? Pulsa otra vez'; return; }
@@ -166,11 +167,20 @@ export function openOptions({ onChange = () => {} }) {
     resetBtn.textContent = 'Progreso borrado ✓';
     onChange();
   } }, 'Borrar progreso');
+  const perfNote = h('small', { class: 'opt-note' });
+  const refreshPerf = () => { if (perfInfo) perfNote.textContent = perfInfo(); };
+  refreshPerf();
+  const timer = setInterval(refreshPerf, 1000);
   return openModal({
     title: '⚙️ Opciones',
     className: 'narrow',
+    onClose: () => clearInterval(timer),
     body: h('div', null,
-      row('Calidad gráfica', seg([['alta', 'Alta'], ['media', 'Media']], s.quality, (v) => { s.quality = v; })),
+      h('div', { class: 'opt-row' },
+        h('span', null, 'Calidad gráfica', perfNote),
+        seg([['auto', 'Automática'], ['alta', 'Alta'], ['media', 'Media'], ['baja', 'Baja']], s.quality, (v) => { s.quality = v; })),
+      row('Mostrar FPS', seg([[true, 'Sí'], [false, 'No']], !!s.showFps, (v) => { s.showFps = v; }), 'Imágenes por segundo (para comprobar la fluidez)'),
+      row('Stick del mando hacia arriba', seg([[false, 'Sube el morro'], [true, 'Baja el morro']], !!s.invertY, (v) => { s.invertY = v; })),
       row('Sonido', seg([[true, 'Sí'], [false, 'No']], s.sound, (v) => setSound(v))),
       row('Órbitas', seg([[true, 'Ver'], [false, 'Ocultar']], s.orbits, (v) => { s.orbits = v; })),
       row('Nombres de los astros', seg([[true, 'Ver'], [false, 'Ocultar']], s.labels, (v) => { s.labels = v; })),
@@ -179,24 +189,61 @@ export function openOptions({ onChange = () => {} }) {
   });
 }
 
+// ---------- Pausa (botón ☰ del mando) ----------
+export function openPauseMenu({ mode, onAction }) {
+  const items = mode === 'adventure'
+    ? [['misiones', '🎯 Misiones'], ['destinos', '🧭 Destinos (hipersalto)'], ['lecciones', '📖 Lecciones'], ['chuleta', '📚 Chuleta'], ['opciones', '⚙️ Opciones'], ['ayuda', '❓ Controles'], ['menu', '🏠 Menú principal']]
+    : [['destinos', '🧭 Destinos (hipersalto)'], ['pasaporte', '🛂 Pasaporte'], ['lecciones', '📖 Lecciones'], ['chuleta', '📚 Chuleta'], ['opciones', '⚙️ Opciones'], ['ayuda', '❓ Controles'], ['menu', '🏠 Menú principal']];
+  const m = openModal({
+    title: '⏸ Pausa',
+    className: 'narrow',
+    body: h('div', { class: 'pause-list' },
+      h('button', { class: 'mission', 'data-gp-default': true, onclick: () => m.close() }, '▶ Continuar'),
+      items.map(([id, label]) => h('button', { class: 'mission', onclick: () => { m.close(); onAction(id); } }, label))),
+  });
+  return m;
+}
+
 // ---------- Ayuda ----------
 export function openHelp() {
   const k = (t) => h('span', { class: 'kbd' }, t);
+  const g = (...names) => h('span', null, names.flatMap((n, i) => (i ? [' ', glyph(n)] : [glyph(n)])));
+  const padAvailable = typeof navigator.getGamepads === 'function';
   return openModal({
     title: '❓ Cómo pilotar la nave',
     className: 'narrow',
-    body: h('div', { class: 'help-grid' },
-      h('span', null, k('W')), h('span', null, 'Acelerar'),
-      h('span', null, k('S')), h('span', null, 'Frenar / marcha atrás'),
-      h('span', null, k('A'), ' ', k('D')), h('span', null, 'Girar a izquierda / derecha (también ', k('←'), ' ', k('→'), ')'),
-      h('span', null, k('↑'), ' ', k('↓')), h('span', null, 'Subir / bajar el morro'),
-      h('span', null, k('Shift')), h('span', null, 'Turbo (mantener junto con W)'),
-      h('span', null, k('Espacio')), h('span', null, 'Freno total'),
-      h('span', null, k('M')), h('span', null, 'Destinos: hipersalto a cualquier astro'),
-      h('span', null, k('E')), h('span', null, 'Elegir astro (en las misiones de vuelo)'),
-      h('span', null, k('P'), ' ', k('L')), h('span', null, 'Pasaporte · Lecciones'),
-      h('span', null, '🖱️'), h('span', null, 'Arrastra para mirar alrededor · rueda para acercar/alejar la cámara'),
-      h('span', null, k('Esc')), h('span', null, 'Cerrar ventanas')),
+    body: h('div', null,
+      h('h3', { class: 'help-title' }, '🎮 Con mando'),
+      padAvailable
+        ? h('div', { class: 'help-grid' },
+          h('span', null, g('LS')), h('span', null, 'Stick izquierdo: girar y subir/bajar el morro'),
+          h('span', null, g('RT')), h('span', null, 'Acelerar (cuanto más aprietas, más rápido)'),
+          h('span', null, g('LT')), h('span', null, 'Frenar / marcha atrás'),
+          h('span', null, g('RB')), h('span', null, 'Turbo (mantener)'),
+          h('span', null, g('LB')), h('span', null, 'Freno total'),
+          h('span', null, g('RS'), ' ', g('R3')), h('span', null, 'Stick derecho: mirar alrededor · clic: cámara detrás'),
+          h('span', null, g('DPAD')), h('span', null, 'Cruceta ↑ ↓: acercar / alejar la cámara'),
+          h('span', null, g('Y')), h('span', null, 'Destinos: hipersalto a cualquier astro'),
+          h('span', null, g('A')), h('span', null, 'Elegir astro (misiones de vuelo) · aceptar en los menús'),
+          h('span', null, g('X')), h('span', null, 'Usar la ficha del astro (escuchar, lecciones)'),
+          h('span', null, g('B')), h('span', null, 'Cerrar / volver'),
+          h('span', null, g('START')), h('span', null, 'Pausa: misiones, pasaporte, lecciones, opciones…'),
+          h('span', null, g('SELECT')), h('span', null, 'Esta ayuda'))
+        : h('p', { class: 'note' }, '⚠️ El mando solo funciona si la web se abre por https:// (o en localhost).'),
+      h('p', { class: 'note' }, 'En los menús: cruceta para moverte, ', glyph('A'), ' para pulsar, ', glyph('B'), ' para volver y ', glyph('LB'), ' ', glyph('RB'), ' para cambiar de pestaña. Si el mando no responde, pulsa cualquier botón para que el navegador lo detecte.'),
+      h('h3', { class: 'help-title' }, '⌨️ Con teclado y ratón'),
+      h('div', { class: 'help-grid' },
+        h('span', null, k('W')), h('span', null, 'Acelerar'),
+        h('span', null, k('S')), h('span', null, 'Frenar / marcha atrás'),
+        h('span', null, k('A'), ' ', k('D')), h('span', null, 'Girar a izquierda / derecha (también ', k('←'), ' ', k('→'), ')'),
+        h('span', null, k('↑'), ' ', k('↓')), h('span', null, 'Subir / bajar el morro'),
+        h('span', null, k('Shift')), h('span', null, 'Turbo (mantener junto con W)'),
+        h('span', null, k('Espacio')), h('span', null, 'Freno total'),
+        h('span', null, k('M')), h('span', null, 'Destinos: hipersalto a cualquier astro'),
+        h('span', null, k('E')), h('span', null, 'Elegir astro (en las misiones de vuelo)'),
+        h('span', null, k('P'), ' ', k('L')), h('span', null, 'Pasaporte · Lecciones'),
+        h('span', null, '🖱️'), h('span', null, 'Arrastra para mirar alrededor · rueda para acercar/alejar la cámara'),
+        h('span', null, k('Esc')), h('span', null, 'Cerrar ventanas'))),
     foot: [h('button', { class: 'btn primary', onclick: (e) => e.target.closest('.modal-back').querySelector('.modal-close').click() }, '¡Entendido!')],
   });
 }

@@ -73,8 +73,9 @@ export function createSolarSystem(scene, { quality = 'alta', envMap } = {}) {
   });
 
   // Cinturones
+  const DENSITY = { alta: 1, media: 0.5, baja: 0.25 };
   const belt = createAsteroidBelt({ count: 3600 });
-  belt.setDensity(quality === 'alta' ? 1 : 0.4);
+  belt.setDensity(DENSITY[quality] ?? 0.5);
   scene.add(belt.group);
   const kuiper = createKuiperBelt();
   scene.add(kuiper.group);
@@ -89,7 +90,7 @@ export function createSolarSystem(scene, { quality = 'alta', envMap } = {}) {
   const cometEntry = addEntry(cometBody, comet, (t, dt) => {
     cometOrbit.position(t, cometEntry.position);
     comet.group.position.copy(cometEntry.position);
-    comet.update(t, dt, cometEntry.position);
+    comet.update(t, dt, cometEntry.position, viewer);
   });
 
   // Voyager 1
@@ -100,6 +101,7 @@ export function createSolarSystem(scene, { quality = 'alta', envMap } = {}) {
 
   const list = [...entries.values()];
   const tmp = new THREE.Vector3();
+  let viewer = null; // posición de la cámara (para ahorrar trabajo en lo que está lejos)
 
   return {
     entries,
@@ -107,7 +109,11 @@ export function createSolarSystem(scene, { quality = 'alta', envMap } = {}) {
     orbitLines,
     minorLabels,
     get(id) { return entries.get(id); },
-    setQuality(q) { belt.setDensity(q === 'alta' ? 1 : 0.4); },
+    setQuality(q) {
+      belt.setDensity(DENSITY[q] ?? 0.5);
+      comet.setDetail(DENSITY[q] ?? 0.5);
+    },
+    setViewer(v) { viewer = v; },
     update(simTime, dt, time) {
       for (const e of list) {
         tmp.copy(e.position);

@@ -12,8 +12,8 @@ export function renderOrder(q) {
       const li = h('li', { draggable: locked ? 'false' : 'true' },
         h('span', { class: 'pos' }, i + 1),
         h('span', { class: 'txt' }, text),
-        h('button', { class: 'mv', type: 'button', title: 'Subir', disabled: locked || i === 0, onclick: () => move(i, i - 1) }, '▲'),
-        h('button', { class: 'mv', type: 'button', title: 'Bajar', disabled: locked || i === items.length - 1, onclick: () => move(i, i + 1) }, '▼'));
+        h('button', { class: 'mv up', type: 'button', title: 'Subir', disabled: locked || i === 0, onclick: () => move(i, i - 1, 'up') }, '▲'),
+        h('button', { class: 'mv down', type: 'button', title: 'Bajar', disabled: locked || i === items.length - 1, onclick: () => move(i, i + 1, 'down') }, '▼'));
       li.addEventListener('dragstart', (e) => { dragIdx = i; li.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); });
       li.addEventListener('dragend', () => { li.classList.remove('dragging'); dragIdx = null; });
       li.addEventListener('dragover', (e) => { e.preventDefault(); li.classList.add('over'); });
@@ -22,11 +22,17 @@ export function renderOrder(q) {
       return li;
     }));
   };
-  const move = (from, to) => {
+  const move = (from, to, via) => {
     if (locked || to < 0 || to >= items.length || from === to) return;
     const [it] = items.splice(from, 1);
     items.splice(to, 0, it);
     draw();
+    // Con las flechas, el foco sigue al elemento movido (útil con teclado y con mando).
+    if (via) {
+      const li = list.children[to];
+      const btn = li?.querySelector(`.mv.${via}:not(:disabled)`) || li?.querySelector('.mv:not(:disabled)');
+      btn?.focus({ preventScroll: true });
+    }
   };
   draw();
   return {

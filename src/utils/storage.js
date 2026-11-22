@@ -9,7 +9,7 @@ const DEFAULTS = () => ({
   leitner: {},
   wrong: {},
   exams: [],
-  settings: { quality: 'alta', sound: true, voice: true, orbits: true, labels: true, helpSeen: false, timeScale: 1 },
+  settings: { version: 2, quality: 'auto', autoTier: null, showFps: false, invertY: false, sound: true, voice: true, orbits: true, labels: true, helpSeen: false, timeScale: 1 },
 });
 
 function load() {
@@ -18,7 +18,13 @@ function load() {
     if (!raw) return DEFAULTS();
     const data = JSON.parse(raw);
     const d = DEFAULTS();
-    return { ...d, ...data, settings: { ...d.settings, ...(data.settings || {}) } };
+    const settings = { ...d.settings, ...(data.settings || {}) };
+    // v1 → v2: la calidad «alta» era el valor por defecto; ahora es la automática.
+    if (!data.settings?.version) {
+      if (settings.quality === 'alta') settings.quality = 'auto';
+      settings.version = 2;
+    }
+    return { ...d, ...data, settings };
   } catch {
     return DEFAULTS();
   }

@@ -69,6 +69,12 @@ export function closeTopModal() {
 
 export const modalOpen = () => stack.some((m) => !m.suspended);
 
+// Ventana visible que está encima de todas (o null).
+export function topModal() {
+  for (let i = stack.length - 1; i >= 0; i--) if (!stack[i].suspended) return stack[i];
+  return null;
+}
+
 export function closeAllModals() {
   [...stack].forEach((m) => m.close());
 }

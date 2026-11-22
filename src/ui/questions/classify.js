@@ -12,11 +12,11 @@ export function renderClassify(q, { onChange }) {
     c.addEventListener('dragstart', (e) => { selected = i; e.dataTransfer.setData('text/plain', String(i)); refresh(); });
     return c;
   });
-  const pool = h('div', { class: 'classify-pool' });
+  const pool = h('div', { class: 'classify-pool', 'data-gp': true, tabindex: '-1' });
   pool.addEventListener('click', () => { if (selected !== null && !locked) { placed.delete(selected); selected = null; refresh(); } });
   const bins = q.groups.map((name, g) => {
     const list = h('div', { class: 'chips' });
-    const bin = h('div', { class: 'bin' }, h('h4', null, name), list);
+    const bin = h('div', { class: 'bin', 'data-gp': true, tabindex: '-1' }, h('h4', null, name), list);
     bin.addEventListener('click', () => drop(g));
     bin.addEventListener('dragover', (e) => { e.preventDefault(); bin.classList.add('over'); });
     bin.addEventListener('dragleave', () => bin.classList.remove('over'));

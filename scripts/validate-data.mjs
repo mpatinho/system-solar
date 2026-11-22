@@ -2,6 +2,7 @@
 import { BODIES, BODY_BY_ID } from '../src/data/bodies.js';
 import { QUESTIONS } from '../src/data/questions.js';
 import { CONCEPT_GROUPS } from '../src/data/concepts.js';
+import { normalizeText } from '../src/utils/dom.js';
 
 const errors = [];
 const err = (m) => errors.push(m);
@@ -48,6 +49,11 @@ for (const q of QUESTIONS) {
     case 'huecos': {
       const n = (q.text.match(/\{\d+\}/g) || []).length;
       if (n !== q.answers.length) err(`${q.id}: ${n} huecos pero ${q.answers.length} respuestas`);
+      // Banco de palabras (para jugar con mando): distracciones que no sean respuestas válidas.
+      if (!Array.isArray(q.bank) || q.bank.length < 2) err(`${q.id}: el banco de palabras necesita al menos 2 distracciones`);
+      const valid = new Set(q.answers.flat().map(normalizeText));
+      for (const w of q.bank || []) if (valid.has(normalizeText(w))) err(`${q.id}: «${w}» está en el banco pero es una respuesta correcta`);
+      if (new Set((q.bank || []).map(normalizeText)).size !== (q.bank || []).length) err(`${q.id}: palabras repetidas en el banco`);
       break;
     }
     case 'clasificar':

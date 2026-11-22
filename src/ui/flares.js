@@ -23,6 +23,7 @@ export function createFlares(container, camera, system) {
   const dir = new THREE.Vector3();
   const oc = new THREE.Vector3();
   let current = 0;
+  let shown = true;
 
   function occluded() {
     dir.copy(system.get('sol').position).sub(camera.position);
@@ -47,13 +48,18 @@ export function createFlares(container, camera, system) {
         target = 1 - Math.min(1, Math.hypot(v.x, v.y) * 0.75);
       }
       current += (target - current) * Math.min(1, dt * 8);
+      // Sin destello: se ocultan y no se toca el DOM en cada fotograma.
+      if (current < 0.01) {
+        if (shown) { shown = false; container.style.display = 'none'; }
+        return;
+      }
+      if (!shown) { shown = true; container.style.display = ''; }
       const sx = (v.x * 0.5 + 0.5) * innerWidth, sy = (-v.y * 0.5 + 0.5) * innerHeight;
       const cx = innerWidth / 2, cy = innerHeight / 2;
       els.forEach((el, i) => {
         const g = GHOSTS[i];
         el.style.opacity = current.toFixed(3);
-        el.style.left = `${sx + (cx - sx) * g.t * 2}px`;
-        el.style.top = `${sy + (cy - sy) * g.t * 2}px`;
+        el.style.transform = `translate(${(sx + (cx - sx) * g.t * 2).toFixed(1)}px, ${(sy + (cy - sy) * g.t * 2).toFixed(1)}px) translate(-50%, -50%)`;
       });
     },
   };

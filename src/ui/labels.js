@@ -5,11 +5,12 @@ import { h } from '../utils/dom.js';
 export function createLabels(container, system, camera, onClick) {
   const v = new THREE.Vector3();
   const up = new THREE.Vector3();
+  const world = new THREE.Vector3();
   const items = system.list.map((e) => {
     const el = h('div', { class: 'label', title: `Hipersalto a ${e.body.name}` }, e.body.short || e.body.name);
     el.addEventListener('click', (ev) => { ev.stopPropagation(); onClick(e); });
     container.append(el);
-    return { e, el, shown: true };
+    return { e, el, shown: true, visited: false, hl: false };
   });
   const minors = system.minorLabels.map((m) => {
     const el = h('div', { class: 'label minor' }, m.name);
@@ -38,12 +39,13 @@ export function createLabels(container, system, camera, onClick) {
         let show = enabled && d > it.e.radius * 2.2;
         if (it.e.id === 'luna' && d > 140) show = false;
         place(it, it.e.position, it.e.radius * 1.15 + d * 0.012, show);
-        it.el.classList.toggle('visited', !!visited[it.e.id]);
-        it.el.style.borderColor = highlightId === it.e.id ? '#ffb547' : '';
+        const vis = !!visited[it.e.id];
+        if (vis !== it.visited) { it.visited = vis; it.el.classList.toggle('visited', vis); }
+        const hl = highlightId === it.e.id;
+        if (hl !== it.hl) { it.hl = hl; it.el.style.borderColor = hl ? '#ffb547' : ''; }
       }
       for (const it of minors) {
-        it.m.object.getWorldPosition(v);
-        const world = v.clone();
+        it.m.object.getWorldPosition(world);
         const d = camera.position.distanceTo(world);
         place(it, world, it.m.radius * 1.3 + d * 0.01, enabled && d < 70);
       }

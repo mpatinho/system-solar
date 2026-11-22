@@ -1,4 +1,5 @@
-// Cámara en tercera persona: sigue a la nave suavemente. Arrastrar con el ratón la orbita; rueda = zoom.
+// Cámara en tercera persona: sigue a la nave suavemente. Arrastrar con el ratón (o el stick derecho) la orbita;
+// rueda (o cruceta ↑/↓) = zoom.
 import * as THREE from 'three';
 
 export class ChaseCamera {
@@ -43,10 +44,22 @@ export class ChaseCamera {
 
   snap() { this.smoothQ.copy(this.ship.root.quaternion); }
 
+  // Stick derecho: mirar alrededor. Mientras se usa, la cámara no vuelve sola detrás de la nave.
+  look(x, y, dt) {
+    this.padLook = Math.abs(x) + Math.abs(y) > 0.01;
+    if (!this.padLook) return;
+    this.yaw -= x * dt * 2.4;
+    this.pitch = THREE.MathUtils.clamp(this.pitch + y * dt * 1.8, -1.2, 1.3);
+  }
+
+  zoom(factor) { this.distance = THREE.MathUtils.clamp(this.distance * factor, 1.4, 40); }
+
+  reset() { this.yaw = 0; this.pitch = 0.12; }
+
   update(dt, speed) {
     const root = this.ship.root;
     // Si la nave va rápido y no se está arrastrando, la cámara vuelve poco a poco detrás.
-    if (!this.dragging && Math.abs(speed) > 2) {
+    if (!this.dragging && !this.padLook && Math.abs(speed) > 2) {
       const k = 1 - Math.exp(-dt * 1.2);
       this.yaw += (0 - this.yaw) * k;
       this.pitch += (0.12 - this.pitch) * k;

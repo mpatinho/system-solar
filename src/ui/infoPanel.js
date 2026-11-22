@@ -49,6 +49,9 @@ export function createInfoPanel({ onLesson }) {
     show,
     hide,
     get currentId() { return currentId; },
+    get el() { return el; },
+    // Cerrar a mano (Esc, B o ×): no se vuelve a abrir hasta salir de la zona.
+    dismiss() { if (currentId) dismissed.add(currentId); hide(); },
     isDismissed: (id) => dismissed.has(id),
     clearDismissed: (keepId) => { for (const id of [...dismissed]) if (id !== keepId) dismissed.delete(id); },
   };

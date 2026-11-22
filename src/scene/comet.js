@@ -64,24 +64,38 @@ export function createComet(body) {
   const motion = new THREE.Vector3();
   const anti = new THREE.Vector3();
   let first = true;
+  let count = N; // partículas activas (según la calidad)
+  let skipped = 0; // dt acumulado cuando el cometa está lejos
+  let frame = 0;
 
   return {
     group,
     tail,
     mesh: nucleus,
     radius: body.render.radius,
-    update(simTime, dt, position) {
-      nucleus.rotation.y += dt * 0.3;
-      nucleus.rotation.x += dt * 0.11;
+    setDetail(fraction) {
+      count = Math.max(300, Math.floor(N * fraction));
+      geo.setDrawRange(0, count);
+    },
+    update(simTime, frameDt, position, viewer) {
+      nucleus.rotation.y += frameDt * 0.3;
+      nucleus.rotation.x += frameDt * 0.11;
+      // Lejos de la cámara, la cola se calcula 1 de cada 4 fotogramas (con el tiempo acumulado).
+      skipped += frameDt;
+      frame++;
+      const far = viewer && viewer.distanceToSquared(position) > 150 * 150;
+      if (far && frame % 4 !== 0) return;
+      const dt = Math.min(0.2, skipped);
+      skipped = 0;
       if (first) { prev.copy(position); first = false; }
-      motion.subVectors(position, prev);
+      motion.subVectors(position, prev).multiplyScalar(frameDt / Math.max(dt, 1e-4));
       prev.copy(position);
       const dist = position.length();
       const activity = THREE.MathUtils.clamp((300 - dist) / 230, 0.08, 1);
       coma.scale.setScalar(1.5 + activity * 5);
       coma.material.opacity = 0.35 + activity * 0.65;
       anti.copy(position).normalize();
-      for (let i = 0; i < N; i++) {
+      for (let i = 0; i < count; i++) {
         const j = i * 3;
         age[i] += dt;
         if (age[i] > life[i]) {

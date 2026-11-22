@@ -13,11 +13,16 @@ export function createSkybox(quality) {
   mesh.rotation.set(THREE.MathUtils.degToRad(62), 0, THREE.MathUtils.degToRad(-30));
   mesh.renderOrder = -10;
   mesh.frustumCulled = false;
+  let current = quality === 'alta' ? 'alta' : 'media';
   return {
     mesh,
     follow(camera) { mesh.position.copy(camera.position); },
+    // La textura de 8k solo con la calidad «Alta» elegida a mano (ocupa mucha memoria de vídeo).
     setQuality(q) {
-      mat.map = tex(q === 'alta' ? '8k_stars_milky_way.jpg' : '4k_stars_milky_way.jpg');
+      const next = q === 'alta' ? 'alta' : 'media';
+      if (next === current) return;
+      current = next;
+      mat.map = tex(next === 'alta' ? '8k_stars_milky_way.jpg' : '4k_stars_milky_way.jpg');
       mat.needsUpdate = true;
     },
   };

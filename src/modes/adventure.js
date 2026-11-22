@@ -104,7 +104,7 @@ export function createAdventure(game) {
         h('div', { class: 'mission-list' }, MISSIONS.map((m, i) => {
           const body = BODY_BY_ID[m.target];
           const st = progress.missions[m.id]?.stars || 0;
-          return h('button', { class: `mission ${i === nextIdx ? 'next' : ''}`, onclick: () => { modal.close(); briefing(m); } },
+          return h('button', { class: `mission ${i === nextIdx ? 'next' : ''}`, 'data-gp-default': i === nextIdx, onclick: () => { modal.close(); briefing(m); } },
             h('span', { class: 'num' }, m.exam ? '📝' : i + 1),
             planetThumb(body),
             h('span', { class: 'txt' }, h('b', null, m.title),
