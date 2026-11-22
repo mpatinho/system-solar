@@ -52,6 +52,19 @@ El certificado y la CA se guardan en un volumen de Docker, así que no cambian a
 
 Puertos: `HTTP_PORT` (8080) y `HTTPS_PORT` (8444); se pueden cambiar en `.env.deploy`.
 
+### Si desde otro ordenador «no se puede acceder»
+
+1. **Prueba con la IP** del servidor (por ejemplo `https://192.168.1.10:8444`). Si así funciona, el problema es el nombre `.local` o IPv6 (punto 3).
+2. **Mac (macOS 15 o posterior)**: si sale *ERR_ADDRESS_UNREACHABLE* incluso con la IP, el navegador no tiene permiso de red local. Ve a *Ajustes del Sistema → Privacidad y seguridad → Red local*, activa Google Chrome (o el navegador que uses) y vuelve a abrirlo.
+3. **Cortafuegos del servidor (ufw) e IPv6**: Docker se salta ufw por IPv4, pero no por IPv6, y los Mac suelen usar IPv6 con los nombres `.local`. Abre los puertos solo para la red de casa (en el servidor):
+
+   ```bash
+   sudo ufw allow from fe80::/10 to any port 8080,8444 proto tcp
+   sudo ufw allow from <prefijo IPv6 de tu red>/64 to any port 8080,8444 proto tcp
+   ```
+
+   El prefijo lo ves con `ip -6 addr show scope global` (las 4 primeras partes de la dirección).
+
 ## Instalar como app
 
 Con la web abierta por `https://` (con el certificado de la CA instalado) o en `localhost`, en ⚙️ Opciones aparece **«📲 Instalar en este ordenador»** (o el icono de instalar en la barra de direcciones de Chrome/Edge). Queda un icono en el escritorio, se abre en su propia ventana y, después de abrirla una vez, **funciona aunque el servidor esté apagado**. Cuando se despliega una versión nueva, se actualiza sola al volver a abrirla.

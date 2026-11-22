@@ -30,5 +30,7 @@ server {
   ssl_certificate /etc/nginx/certs/server.crt;
   ssl_certificate_key /etc/nginx/certs/server.key;
   ssl_protocols TLSv1.2 TLSv1.3;
+  # Si se escribe la dirección sin https:// (http al puerto seguro), se redirige en vez de dar el error 400.
+  error_page 497 =301 https://$host:${HTTPS_PORT}$request_uri;
   include /etc/nginx/web.conf;
 }
