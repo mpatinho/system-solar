@@ -49,7 +49,7 @@ export function createComet(body) {
       varying vec3 vColor;
       void main() {
         float d = length(gl_PointCoord - 0.5);
-        float a = smoothstep(0.5, 0.0, d);
+        float a = 1.0 - smoothstep(0.0, 0.5, d); // smoothstep con los bordes al revés no está definido en GLSL
         gl_FragColor = vec4(vColor * a, 1.0);
         ${OUTPUT_CHUNKS}
       }`,

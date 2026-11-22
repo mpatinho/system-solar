@@ -32,7 +32,7 @@ export function makeAtmosphere(radius, { color = [0.4, 0.6, 1], intensity = 1, t
           float t = clamp((h - R) / (Ra - R), 0.0, 1.0);
           a = pow(1.0 - t, 2.3);
         }
-        vec3 n = normalize(closest - center);
+        vec3 n = normalize(closest - center + vec3(1e-6)); // evita normalize(0) = NaN
         vec3 L = normalize(-center);
         float lit = smoothstep(-0.35, 0.55, dot(n, L));
         gl_FragColor = vec4(color * a * lit * intensity, 1.0);

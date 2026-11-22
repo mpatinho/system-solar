@@ -81,12 +81,13 @@ export function createShip(envMap) {
     fragmentShader: /* glsl */ `
       uniform float time; uniform float power; varying vec2 vUv;
       void main(){
-        float along = vUv.y;
+        // clamp: con MSAA el borde del cono puede dar vUv.y < 0, y pow(negativo) = NaN (el bloom lo vuelve un cuadrado negro).
+        float along = clamp(vUv.y, 0.0, 1.0);
         float flick = 0.85 + 0.15 * sin(time * 40.0 + vUv.x * 30.0);
         vec3 core = vec3(0.9, 1.4, 3.2);
         vec3 edge = vec3(0.2, 0.5, 2.0);
         vec3 col = mix(edge, core, along) * pow(along, 1.6) * power * 1.3 * flick;
-        gl_FragColor = vec4(col, 1.0);
+        gl_FragColor = vec4(max(col, vec3(0.0)), 1.0);
         ${OUTPUT_CHUNKS}
       }`,
     blending: THREE.AdditiveBlending,
