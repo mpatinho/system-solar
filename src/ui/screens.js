@@ -8,16 +8,19 @@ import { progress, save, rankFor, resetProgress } from '../utils/storage.js';
 import { setSound } from '../utils/audio.js';
 import { formatNota } from '../utils/dom.js';
 import { glyph } from '../input/gamepad.js';
+import { dailyStatus, examCountdownText } from '../modes/daily.js';
 
 const ORDER = ['sol', 'mercurio', 'venus', 'tierra', 'luna', 'marte', 'cinturon', 'jupiter', 'saturno', 'urano', 'neptuno', 'pluton', 'cometa', 'voyager'];
 const ordered = () => ORDER.map((id) => BODY_BY_ID[id]);
 
 // ---------- Menú principal ----------
-export function showMainMenu({ onExplore, onAdventure, onOptions = () => openOptions({}) }) {
+export function showMainMenu({ onExplore, onAdventure, onOptions = () => openOptions({}), onDaily, onHangar, onGames }) {
   const ui = document.getElementById('ui');
   const visited = Object.keys(progress.visited).length;
   const rank = rankFor(progress.points);
   const best = progress.exams.length ? Math.max(...progress.exams.map((e) => e.nota)) : null;
+  const daily = dailyStatus();
+  const countdown = examCountdownText();
   const el = h('div', { class: 'menu' },
     h('div', { class: 'menu-card' },
       h('h1', { class: 'menu-title' }, 'Explorador del ', h('span', null, 'Sistema Solar')),
@@ -27,6 +30,12 @@ export function showMainMenu({ onExplore, onAdventure, onOptions = () => openOpt
           h('div', { class: 'icon' }, '🔭'), h('h3', null, 'Exploración'), h('p', null, 'Viaja libremente y aprende todo lo que entra en el examen.')),
         h('button', { class: 'mode-card', onclick: () => { el.remove(); onAdventure(); } },
           h('div', { class: 'icon' }, '🚀'), h('h3', null, 'Aventura'), h('p', null, 'Cumple misiones respondiendo preguntas como las del examen.'))),
+      h('div', { class: 'menu-row menu-extra' },
+        h('button', { class: `btn ${daily.done ? '' : 'daily-pending'}`, onclick: () => onDaily?.() },
+          '🔥 Reto del día', h('small', null, daily.done ? `¡Hecho! Racha: ${daily.streak}` : daily.streak ? `Pendiente · racha ${daily.streak}` : 'Pendiente')),
+        h('button', { class: 'btn', onclick: () => onHangar?.() }, '🛠️ Hangar', h('small', null, 'Personaliza tu nave')),
+        h('button', { class: 'btn', onclick: () => onGames?.() }, '🕹️ Minijuegos', h('small', null, 'Asteroides y carreras'))),
+      countdown ? h('div', { class: 'menu-countdown' }, countdown) : null,
       h('div', { class: 'menu-row' },
         h('button', { class: 'btn', onclick: () => openStudySheet() }, '📚 Chuleta de estudio'),
         h('button', { class: 'btn', onclick: () => openLessonsList() }, '📖 Lecciones'),
@@ -151,7 +160,7 @@ export function openLessonsList() {
 }
 
 // ---------- Opciones ----------
-export function openOptions({ onChange = () => {}, perfInfo } = {}) {
+export function openOptions({ onChange = () => {}, perfInfo, install, onClose } = {}) {
   const s = progress.settings;
   const seg = (options, value, set) => {
     const wrap = h('div', { class: 'seg' });
@@ -174,7 +183,7 @@ export function openOptions({ onChange = () => {}, perfInfo } = {}) {
   return openModal({
     title: '⚙️ Opciones',
     className: 'narrow',
-    onClose: () => clearInterval(timer),
+    onClose: () => { clearInterval(timer); onClose?.(); },
     body: h('div', null,
       h('div', { class: 'opt-row' },
         h('span', null, 'Calidad gráfica', perfNote),
@@ -185,15 +194,41 @@ export function openOptions({ onChange = () => {}, perfInfo } = {}) {
       row('Órbitas', seg([[true, 'Ver'], [false, 'Ocultar']], s.orbits, (v) => { s.orbits = v; })),
       row('Nombres de los astros', seg([[true, 'Ver'], [false, 'Ocultar']], s.labels, (v) => { s.labels = v; })),
       row('Velocidad del tiempo', seg([[0, '⏸'], [1, '×1'], [10, '×10'], [50, '×50']], s.timeScale, (v) => { s.timeScale = v; })),
+      examDateRow(onChange),
+      install ? installRow(install) : null,
       row('Progreso (sellos, puntos, notas)', resetBtn)),
   });
 }
 
+// Fecha del examen: muestra la cuenta atrás en el menú y en el reto del día.
+function examDateRow(onChange) {
+  const input = h('input', { type: 'date', class: 'date-input', value: progress.examDate || '' });
+  const info = h('small', { class: 'opt-note' });
+  const refresh = () => { info.textContent = examCountdownText() || (progress.examDate ? 'La fecha ya ha pasado' : 'Sin fecha'); };
+  input.addEventListener('change', () => { progress.examDate = input.value || null; save(); refresh(); onChange(); });
+  const clear = h('button', { class: 'btn small', onclick: () => { input.value = ''; progress.examDate = null; save(); refresh(); onChange(); } }, 'Quitar');
+  refresh();
+  return h('div', { class: 'opt-row' }, h('span', null, '📅 Fecha del examen', info), h('span', { class: 'date-ctl' }, input, clear));
+}
+
+// Instalar como app (PWA): solo si el navegador lo ofrece.
+function installRow(install) {
+  const wrap = h('span');
+  const draw = () => {
+    if (install.installed()) wrap.replaceChildren(h('span', { class: 'note' }, '✓ Ya está instalada'));
+    else if (install.available()) wrap.replaceChildren(h('button', { class: 'btn small primary', onclick: async () => { await install.prompt(); draw(); } }, '📲 Instalar en este ordenador'));
+    else wrap.replaceChildren(h('span', { class: 'note' }, 'No disponible aquí: ábrela por https con el certificado instalado (ver README) o desde el menú del navegador.'));
+  };
+  draw();
+  return h('div', { class: 'opt-row' }, h('span', null, '📲 Instalar como app', h('small', { class: 'opt-note' }, 'Icono en el escritorio y funciona sin conexión')), wrap);
+}
+
 // ---------- Pausa (botón ☰ del mando) ----------
 export function openPauseMenu({ mode, onAction }) {
+  const common = [['reto', '🔥 Reto del día'], ['lecciones', '📖 Lecciones'], ['chuleta', '📚 Chuleta'], ['hangar', '🛠️ Hangar'], ['juegos', '🕹️ Minijuegos'], ['opciones', '⚙️ Opciones'], ['ayuda', '❓ Controles'], ['menu', '🏠 Menú principal']];
   const items = mode === 'adventure'
-    ? [['misiones', '🎯 Misiones'], ['destinos', '🧭 Destinos (hipersalto)'], ['lecciones', '📖 Lecciones'], ['chuleta', '📚 Chuleta'], ['opciones', '⚙️ Opciones'], ['ayuda', '❓ Controles'], ['menu', '🏠 Menú principal']]
-    : [['destinos', '🧭 Destinos (hipersalto)'], ['pasaporte', '🛂 Pasaporte'], ['lecciones', '📖 Lecciones'], ['chuleta', '📚 Chuleta'], ['opciones', '⚙️ Opciones'], ['ayuda', '❓ Controles'], ['menu', '🏠 Menú principal']];
+    ? [['misiones', '🎯 Misiones'], ['destinos', '🧭 Destinos (hipersalto)'], ...common]
+    : [['destinos', '🧭 Destinos (hipersalto)'], ['pasaporte', '🛂 Pasaporte'], ...common];
   const m = openModal({
     title: '⏸ Pausa',
     className: 'narrow',

@@ -17,6 +17,8 @@ export function createHud({ onButton }) {
     pasaporte: btn('pasaporte', '🛂 Pasaporte', 'Tus sellos de viaje (P)'),
     lecciones: btn('lecciones', '📖 Lecciones', 'Lecciones interactivas (L)'),
     chuleta: btn('chuleta', '📚 Chuleta', 'Resumen para estudiar'),
+    reto: btn('reto', '🔥 Reto', 'Reto del día'),
+    hangar: btn('hangar', '🛠️', 'Hangar: personaliza tu nave'),
     opciones: btn('opciones', '⚙️', 'Opciones'),
     ayuda: btn('ayuda', '❓', 'Controles (H)'),
     menu: btn('menu', '🏠', 'Menú principal'),
@@ -61,8 +63,8 @@ export function createHud({ onButton }) {
     setMode(mode) {
       modeEl.textContent = mode === 'adventure' ? '🚀 MODO AVENTURA' : '🔭 MODO EXPLORACIÓN';
       const ids = mode === 'adventure'
-        ? ['misiones', 'destinos', 'lecciones', 'chuleta', 'opciones', 'ayuda', 'menu']
-        : ['destinos', 'pasaporte', 'lecciones', 'chuleta', 'opciones', 'ayuda', 'menu'];
+        ? ['misiones', 'destinos', 'reto', 'lecciones', 'chuleta', 'hangar', 'opciones', 'ayuda', 'menu']
+        : ['destinos', 'pasaporte', 'reto', 'lecciones', 'chuleta', 'hangar', 'opciones', 'ayuda', 'menu'];
       buttons.replaceChildren(...ids.map((id) => BUTTONS[id]));
     },
     setExtra(...nodes) { extraEl.replaceChildren(...nodes); },

@@ -6,6 +6,8 @@ Se pilota una nave espacial por un Sistema Solar realista, **con teclado y rató
 - **🔭 Exploración**: vuelo libre. Al acercarte a un astro aparece su ficha con los datos reales, un recuadro **«📌 Para el examen»**, una curiosidad y lectura en voz alta. Cada astro visitado pone un sello en el *pasaporte espacial*.
 - **🚀 Aventura**: 14 misiones más un **examen final**. Vuelas hasta el objetivo y respondes preguntas como las de los exámenes del cole: test, verdadero/falso con corrección, ordenar, unir con flechas, completar huecos, clasificar, identificar planetas o fases de la Luna, definiciones… y **preguntas de vuelo**, que se responden pilotando hasta el astro correcto. Tienes 3 escudos por misión, puntos y rangos. El examen final se puntúa sobre 10 (Insuficiente → Sobresaliente). Las preguntas falladas se repiten más a menudo.
 
+Además tiene **🔥 reto del día** (8 preguntas centradas en lo que más falla, con racha de días y cuenta atrás hasta la fecha del examen), **🛠️ hangar** para personalizar la nave (modelos, pinturas, llamas y estelas que se desbloquean jugando) y **🕹️ minijuegos** («Lluvia de respuestas» y «Carrera de planetas»).
+
 Incluye también **lecciones interactivas** (rotación y día/noche, traslación y estaciones, años bisiestos, fases de la Luna, eclipses, capas de la Tierra, tamaños y distancias reales, el Universo) y una **chuleta de estudio imprimible**.
 
 ## Arrancar con Docker en este ordenador
@@ -49,6 +51,16 @@ Sin instalarlo también funciona: el navegador avisa y hay que pulsar *Configura
 El certificado y la CA se guardan en un volumen de Docker, así que no cambian al actualizar la web. Si el servidor cambia de IP, actualiza `CERT_HOSTS` y vuelve a desplegar. Es mejor reservarle una IP fija en el router, o usar siempre su nombre `.local`.
 
 Puertos: `HTTP_PORT` (8080) y `HTTPS_PORT` (8444); se pueden cambiar en `.env.deploy`.
+
+## Instalar como app
+
+Con la web abierta por `https://` (con el certificado de la CA instalado) o en `localhost`, en ⚙️ Opciones aparece **«📲 Instalar en este ordenador»** (o el icono de instalar en la barra de direcciones de Chrome/Edge). Queda un icono en el escritorio, se abre en su propia ventana y, después de abrirla una vez, **funciona aunque el servidor esté apagado**. Cuando se despliega una versión nueva, se actualiza sola al volver a abrirla.
+
+Sin el certificado instalado, Chrome no deja instalarla (el resto del juego funciona igual).
+
+## Fecha del examen y reto del día
+
+En ⚙️ Opciones → **📅 Fecha del examen**: el menú principal y el reto del día muestran cuántos días faltan. El reto del día da puntos extra la primera vez de cada día y mantiene una racha; algunas cosas del hangar se desbloquean con la racha.
 
 ## Controles
 

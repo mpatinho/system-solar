@@ -1,5 +1,7 @@
 // Comprueba que los datos del temario y el banco de preguntas son coherentes.
-import { BODIES, BODY_BY_ID } from '../src/data/bodies.js';
+import { BODIES, BODY_BY_ID, speechText } from '../src/data/bodies.js';
+import { toSpeech } from '../src/utils/speechText.js';
+import { CATEGORIES, DEFAULT_STYLE, reqText } from '../src/ship/styles.js';
 import { QUESTIONS } from '../src/data/questions.js';
 import { CONCEPT_GROUPS } from '../src/data/concepts.js';
 import { normalizeText } from '../src/utils/dom.js';
@@ -12,6 +14,10 @@ for (const b of BODIES) {
   for (const k of ['id', 'name', 'kind', 'subtitle', 'facts', 'exam', 'curiosity', 'render']) if (!b[k]) err(`Astro ${b.id}: falta «${k}»`);
   if (!Array.isArray(b.facts) || b.facts.length < 4) err(`Astro ${b.id}: pocos datos (${b.facts?.length})`);
   if (!b.exam?.length) err(`Astro ${b.id}: sin «Para el examen»`);
+  // Lo que se lee en voz alta no debe tener abreviaturas que la voz deletree («k m»).
+  const spoken = toSpeech(speechText(b));
+  const bad = spoken.match(/\bkm\b|°|−|\d\.º|\d\.\d{3}\b/);
+  if (bad) err(`Astro ${b.id}: la voz leería «${bad[0]}» en «…${spoken.slice(Math.max(0, bad.index - 30), bad.index + 20)}…»`);
 }
 
 // Preguntas
@@ -78,6 +84,20 @@ if (!CONCEPT_GROUPS.length) err('Faltan conceptos');
 
 console.log(`Astros: ${BODIES.length} · Preguntas: ${QUESTIONS.length}`);
 console.log('Por tipo:', Object.entries(types).map(([k, v]) => `${k}=${v}`).join(', '));
+// Hangar: ids únicos, lo gratuito existe y cada requisito se sabe explicar.
+const REQ_KEYS = ['points', 'stamps', 'examNota', 'streak', 'asteroids'];
+for (const c of CATEGORIES) {
+  const ids = c.items.map((i) => i.id);
+  if (new Set(ids).size !== ids.length) err(`Hangar ${c.key}: ids repetidos`);
+  if (!ids.includes(DEFAULT_STYLE[c.key])) err(`Hangar ${c.key}: falta el valor por defecto «${DEFAULT_STYLE[c.key]}»`);
+  for (const it of c.items) {
+    if (!it.req) continue;
+    const keys = Object.keys(it.req);
+    if (keys.length !== 1 || !REQ_KEYS.includes(keys[0])) err(`Hangar ${c.key}/${it.id}: requisito no válido`);
+    if (!reqText(it.req)) err(`Hangar ${c.key}/${it.id}: requisito sin texto`);
+  }
+}
+
 if (errors.length) {
   console.error(`\n❌ ${errors.length} errores:\n- ${errors.join('\n- ')}`);
   process.exit(1);

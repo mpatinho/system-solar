@@ -6,7 +6,9 @@ import { showMissionResult, showExamResult, stars } from '../ui/results.js';
 import { openReviewFor } from '../ui/screens.js';
 import { QUESTIONS, QUESTION_BY_ID } from '../data/questions.js';
 import { BODY_BY_ID } from '../data/bodies.js';
-import { progress, save, rankFor, questionWeight, pendingWrongIds } from '../utils/storage.js';
+import { progress, save, rankFor, pendingWrongIds } from '../utils/storage.js';
+import { pick } from '../utils/pick.js';
+import { dailyStatus } from './daily.js';
 import { sfx } from '../utils/audio.js';
 import { state } from '../state.js';
 
@@ -27,25 +29,6 @@ export const MISSIONS = [
   { id: 'repaso', title: 'Repaso de todo el Sistema Solar', target: 'sol', tags: ['general'] },
   { id: 'examen', title: 'EXAMEN FINAL', target: 'tierra', exam: true },
 ];
-
-// Muestreo ponderado (las preguntas falladas salen más) sin repetir y con variedad de tipos.
-function pick(pool, n, { maxPerType = 2, avoid = new Set() } = {}) {
-  const chosen = [];
-  const typeCount = {};
-  let candidates = pool.filter((q) => !avoid.has(q.id));
-  while (chosen.length < n && candidates.length) {
-    const ok = candidates.filter((q) => (typeCount[q.type] || 0) < maxPerType);
-    const list = ok.length ? ok : candidates;
-    const total = list.reduce((s, q) => s + questionWeight(q.id), 0);
-    let r = Math.random() * total;
-    let q = list[list.length - 1];
-    for (const c of list) { r -= questionWeight(c.id); if (r <= 0) { q = c; break; } }
-    chosen.push(q);
-    typeCount[q.type] = (typeCount[q.type] || 0) + 1;
-    candidates = candidates.filter((c) => c !== q);
-  }
-  return chosen;
-}
 
 function missionQuestions(m) {
   const pool = QUESTIONS.filter((q) => q.type !== 'vuelo' && q.tags.some((t) => m.tags.includes(t)));
@@ -98,6 +81,8 @@ export function createAdventure(game) {
             h('b', null, r.name), ' · ', `${progress.points.toLocaleString('es-ES')} puntos`,
             r.next ? h('div', { class: 'note' }, `Siguiente rango: ${r.next.name} (${r.next.min.toLocaleString('es-ES')} puntos)`) : h('div', { class: 'note' }, '¡Rango máximo!'),
             h('div', { class: 'rank-progress' }, h('div', { style: { width: `${Math.round(r.pct * 100)}%` } })))),
+        game.openDaily ? h('button', { class: 'mission daily-mission', style: { marginBottom: '10px' }, onclick: () => { modal.close(); game.openDaily(); } },
+          h('b', null, '🔥 Reto del día'), h('div', { class: 'note' }, dailyStatus().done ? `¡Hecho hoy! Racha de ${dailyStatus().streak} ${dailyStatus().streak === 1 ? 'día' : 'días'}. Puedes repetirlo para repasar.` : '8 preguntas de lo que más te cuesta. ¡No pierdas la racha!')) : null,
         wrong.length ? h('button', { class: 'mission', style: { marginBottom: '10px', borderColor: '#f87171' }, onclick: () => { modal.close(); startReview(wrong); } },
           h('span', { class: 'num' }, '🔁'),
           h('span', { class: 'txt' }, h('b', null, `Repaso de fallos (${wrong.length})`), h('small', null, 'Vuelve a practicar las preguntas que has fallado. ¡Sin escudos!'))) : null,

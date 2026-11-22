@@ -99,6 +99,8 @@ export function createUiNav(pad) {
     update(dt, root, { onBack } = {}) {
       if (root !== scope) { clear(); scope = root; }
       if (!root || !pad.active) { if (current && !pad.active) clear(); return; }
+      // Minijuego en marcha: el mando lo lee el propio juego.
+      if (root.matches('[data-gp-capture]')) { if (current) clear(); return; }
 
       // Si alguien movió el foco (por ejemplo, «Siguiente →» tras responder), se adopta.
       const ae = document.activeElement;

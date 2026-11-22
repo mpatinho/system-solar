@@ -313,6 +313,68 @@ body:has(.info-panel) #hud .hint { display: none; }
 .credits a { color: var(--accent-2); }
 
 /* ---------- impresión de la chuleta ---------- */
+/* ---------- Reto del día, hangar y minijuegos ---------- */
+.mission:has(> b) { flex-direction: column; align-items: flex-start; gap: 2px; }
+.mission > b { font-family: var(--font-title); font-size: 18px; }
+.pts { font-family: var(--font-title); font-size: 24px; color: var(--accent); font-weight: 800; }
+.menu-extra { margin: 12px 0 4px; }
+.menu-extra .btn { display: inline-flex; flex-direction: column; align-items: center; min-width: 150px; }
+.menu-extra .btn small { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 2px; }
+.btn.daily-pending { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255, 181, 71, 0.25); animation: dailyPulse 2s ease-in-out infinite; }
+@keyframes dailyPulse { 50% { box-shadow: 0 0 0 5px rgba(255, 181, 71, 0.12); } }
+.menu-countdown { margin-top: 10px; font-weight: 800; color: var(--accent); font-size: 17px; }
+.daily-mission { border-color: var(--accent) !important; }
+.daily-result { text-align: center; }
+.daily-result .flame { font-size: 64px; line-height: 1; position: relative; display: inline-block; }
+.daily-result .flame span { position: absolute; left: 50%; top: 58%; transform: translate(-50%, -50%); font-family: var(--font-title); font-size: 26px; font-weight: 800; color: #fff; text-shadow: 0 2px 6px #000; }
+.daily-result h3 { font-family: var(--font-title); font-size: 24px; margin: 6px 0; }
+.daily-result .countdown { font-weight: 800; color: var(--accent); }
+.date-ctl { display: inline-flex; gap: 8px; align-items: center; }
+.date-input { font: inherit; font-size: 15px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--border); background: #0f1d3d; color: var(--text); color-scheme: dark; }
+
+.hangar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.hangar-view canvas { width: 100%; height: auto; aspect-ratio: 46 / 30; border-radius: 16px; border: 1px solid var(--border); display: block; }
+.hangar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.hangar-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 8px; border-radius: 14px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); cursor: pointer; font: inherit; }
+.hangar-item:hover { border-color: var(--accent-2); }
+.hangar-item.on { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255, 181, 71, 0.3); }
+.hangar-item.locked { opacity: 0.55; }
+.hangar-item .name { font-weight: 800; }
+.hangar-item .req { font-size: 12px; color: var(--muted); text-align: center; }
+.hangar-item.on .req { color: var(--accent); font-weight: 800; }
+.sw { width: 46px; height: 46px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); display: grid; place-items: center; font-size: 26px; }
+.sw-icon { background: #0f1d3d; }
+.sw-rainbow { background: conic-gradient(#ff4d4d, #ffb547, #facc15, #4ade80, #58c4ff, #a78bfa, #f472b6, #ff4d4d); }
+.sw-dots { background: #0f1d3d; font-size: 15px; letter-spacing: -2px; }
+@media (max-width: 760px) { .hangar { grid-template-columns: 1fr; } }
+
+.game-wrap { position: relative; }
+.game-canvas { width: 100%; height: auto; aspect-ratio: 760 / 460; display: block; border-radius: 14px; border: 1px solid var(--border); background: #02040c; touch-action: none; }
+.game-screen { position: absolute; inset: 0; display: grid; place-items: center; padding: 14px; background: rgba(2, 4, 12, 0.72); border-radius: 14px; overflow: auto; }
+.game-card { text-align: center; max-width: 560px; width: 100%; margin: 0 auto; }
+.game-card h3 { font-family: var(--font-title); font-size: 26px; margin: 4px 0 8px; }
+.game-card .big-score { font-family: var(--font-title); font-size: 52px; font-weight: 800; color: var(--accent); line-height: 1.1; }
+.game-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+.game-review { text-align: left; max-height: 180px; overflow: auto; margin-top: 8px; }
+.medal-line { font-size: 22px; font-weight: 800; }
+.race { position: relative; min-height: 320px; }
+.race-head { display: flex; justify-content: space-between; align-items: center; font-size: 18px; margin-bottom: 10px; }
+.race-clock { font-family: var(--font-title); font-size: 28px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+.race-track { display: flex; align-items: center; gap: 6px; padding: 10px; border-radius: 16px; background: #050a18; border: 1px solid var(--border); margin-bottom: 14px; overflow-x: auto; }
+.race-track .sun-dot { font-size: 28px; }
+.race-slot { flex: 1; min-width: 64px; height: 74px; border-radius: 12px; border: 2px dashed rgba(120, 180, 255, 0.25); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+.race-slot.filled { border-style: solid; border-color: var(--ok); animation: modalIn 0.2s ease-out; }
+.race-slot .planet-thumb { width: 44px; height: 44px; }
+.race-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.race-planet { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px; border-radius: 16px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); font: inherit; font-weight: 800; cursor: pointer; }
+.race-planet:hover:not(:disabled) { border-color: var(--accent); }
+.race-planet:disabled { opacity: 0.25; cursor: default; }
+.race-planet.done { opacity: 0.15; }
+.race-planet.shake { animation: shake 0.35s; border-color: var(--bad); }
+@keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+.race-count { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--font-title); font-size: 96px; font-weight: 800; color: var(--accent); text-shadow: 0 0 30px rgba(255, 181, 71, 0.6); pointer-events: none; }
+.race-variants { display: grid; gap: 10px; margin: 12px 0; }
+
 /* ---------- Mando ---------- */
 body:not(.gp-mode) .gp-only { display: none !important; }
 body.gp-mode .kbd-only { display: none !important; }

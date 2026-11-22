@@ -2,7 +2,7 @@
 import './ui/styles.css';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { state } from './state.js';
+import { state, on } from './state.js';
 import { progress, save } from './utils/storage.js';
 import { h } from './utils/dom.js';
 import { unlockAudio, updateEngine, silenceEngine, sfx } from './utils/audio.js';
@@ -23,7 +23,11 @@ import { createFlares } from './ui/flares.js';
 import { createInfoPanel } from './ui/infoPanel.js';
 import { openLesson } from './ui/demos/index.js';
 import { closeTopModal, closeAllModals, modalOpen, topModal, toast, flash } from './ui/modal.js';
-import { showMainMenu, openDestinations, openPassport, openStudySheet, openLessonsList, openOptions, openHelp, openPauseMenu } from './ui/screens.js';
+import { showMainMenu, openDestinations, openPassport, openStudySheet, openLessonsList, openOptions, openHelp, openPauseMenu, openReviewFor } from './ui/screens.js';
+import { openHangar } from './ui/hangar.js';
+import { openGames } from './games/index.js';
+import { startDaily, dailyStatus } from './modes/daily.js';
+import { currentStyle, newUnlocks } from './ship/styles.js';
 import { createExploration } from './modes/exploration.js';
 import { createAdventure } from './modes/adventure.js';
 import { runQuiz } from './ui/quiz.js';
@@ -55,8 +59,8 @@ scene.add(sky.mesh);
 const system = createSolarSystem(scene, { quality: currentTier(), envMap });
 system.setViewer(camera.position);
 
-const ship = createShip(envMap);
-scene.add(ship.root);
+const ship = createShip(envMap, currentStyle(progress));
+scene.add(ship.root, ship.trail);
 const controls = new ShipControls(ship);
 const chase = new ChaseCamera(camera, ship, canvas);
 const autopilot = new Autopilot(ship, controls, chase, camera);
@@ -78,6 +82,7 @@ const game = {
   near: { entry: null, inZone: false, distance: Infinity },
   setTarget(e) { target = e; },
   hyperjump,
+  openDaily,
 };
 const modes = { explore: createExploration(game), adventure: createAdventure(game) };
 let mode = null;
@@ -103,11 +108,48 @@ function handleButton(id) {
     case 'pasaporte': openPassport(); break;
     case 'lecciones': openLessonsList(); break;
     case 'chuleta': openStudySheet(); break;
-    case 'opciones': openOptions({ onChange: applySettings, perfInfo }); break;
+    case 'opciones': openOptions({ onChange: applySettings, perfInfo, install }); break;
+    case 'reto': openDaily(); break;
+    case 'hangar': openHangar({ onStyle: (s) => ship.setStyle(s) }); break;
+    case 'juegos': openGames(); break;
     case 'ayuda': openHelp(); break;
     case 'menu': goToMenu(); break;
     default:
   }
+}
+
+// ---------- Reto del día, hangar y avisos ----------
+function openDaily() {
+  if (autopilot.active) return;
+  startDaily({ onReview: (q) => openReviewFor(q), onClose: () => { if (state.mode === 'menu') goToMenu(); } });
+}
+
+// Lo que se desbloquea en el hangar se anuncia una sola vez.
+let unlockTimer = 0;
+function checkUnlocks() {
+  const news = newUnlocks(progress);
+  if (!news.length) return;
+  progress.hangar.seen.push(...news.map((n) => n.key));
+  save();
+  const one = news[0];
+  toast(news.length === 1 ? `🎁 ¡Nuevo en el hangar: ${one.category.title.toLowerCase()} «${one.item.name}»!` : `🎁 ¡Tienes ${news.length} cosas nuevas en el hangar! 🛠️`, 'gold', 4500);
+}
+on('progress', () => {
+  clearTimeout(unlockTimer);
+  unlockTimer = setTimeout(() => { checkUnlocks(); if (state.mode === 'menu') refreshMenu(); }, 500);
+});
+
+// ---------- Instalar como app (PWA) ----------
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installPrompt = e; });
+window.addEventListener('appinstalled', () => { installPrompt = null; toast('📲 ¡Instalada! Ya tienes el icono en el escritorio.', 'ok', 4000); });
+const install = {
+  available: () => !!installPrompt,
+  installed: () => window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true,
+  async prompt() { if (!installPrompt) return; installPrompt.prompt(); await installPrompt.userChoice.catch(() => {}); installPrompt = null; },
+};
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => { /* sin certificado válido: sin modo app */ }));
 }
 
 function perfInfo() {
@@ -131,6 +173,7 @@ function applySettings() {
   system.orbitLines.visible = settings.orbits;
   controls.invertY = !!settings.invertY;
   fpsEl.classList.toggle('hidden', !settings.showFps);
+  ship.setStyle(currentStyle(progress)); // por si se ha borrado el progreso
 }
 
 // ---------- Posición inicial: junto a la Tierra ----------
@@ -161,6 +204,30 @@ function startMode(name) {
     save();
     openHelp();
   }
+  if (!dailyReminded && !dailyStatus().done) {
+    dailyReminded = true;
+    setTimeout(() => toast('🔥 ¡Aún no has hecho el reto de hoy! Pulsa «🔥 Reto» arriba.', 'gold', 5000), 1500);
+  }
+}
+let dailyReminded = false;
+
+// Vuelve a dibujar el menú principal (puntos, racha…) sin cerrar las ventanas abiertas.
+function refreshMenu() {
+  if (!menuEl?.isConnected) return;
+  const old = menuEl;
+  menuEl = buildMenu();
+  old.replaceWith(menuEl);
+}
+
+function buildMenu() {
+  return showMainMenu({
+    onExplore: () => startMode('explore'),
+    onAdventure: () => startMode('adventure'),
+    onOptions: () => openOptions({ onChange: applySettings, perfInfo, install, onClose: () => { if (state.mode === 'menu') goToMenu(); } }),
+    onDaily: openDaily,
+    onHangar: () => openHangar({ onStyle: (s) => ship.setStyle(s), onClose: () => { if (state.mode === 'menu') goToMenu(); } }),
+    onGames: openGames,
+  });
 }
 
 function goToMenu() {
@@ -174,11 +241,7 @@ function goToMenu() {
   info.hide();
   silenceEngine();
   menuEl?.remove();
-  menuEl = showMainMenu({
-    onExplore: () => startMode('explore'),
-    onAdventure: () => startMode('adventure'),
-    onOptions: () => openOptions({ onChange: applySettings, perfInfo }),
-  });
+  menuEl = buildMenu();
 }
 
 // ---------- Teclado ----------
@@ -302,7 +365,7 @@ function frame() {
     turbo = c.turbo;
     collide(elapsed);
   }
-  ship.setThrust(power, elapsed);
+  ship.setThrust(power, elapsed, dt);
 
   if (!inGame) {
     chase.yaw += dt * 0.08; // giro lento de cámara en el menú
@@ -354,6 +417,7 @@ function start() {
   applySettings();
   document.getElementById('loading').classList.add('done');
   goToMenu();
+  setTimeout(checkUnlocks, 2500);
   if (softwareRendering) {
     toast('⚠️ El navegador está dibujando sin la tarjeta gráfica y todo irá lento. Activa la «aceleración por hardware» en su configuración.', 'bad', 9000);
   }

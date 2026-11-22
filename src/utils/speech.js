@@ -1,4 +1,5 @@
 // Lectura en voz alta (Web Speech API, español de España si está disponible).
+import { toSpeech } from './speechText.js';
 let voice = null;
 
 function pickVoice() {
@@ -17,7 +18,7 @@ export const speechAvailable = () => 'speechSynthesis' in window;
 export function speak(text, onEnd) {
   if (!speechAvailable()) return;
   speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
+  const u = new SpeechSynthesisUtterance(toSpeech(text));
   u.lang = 'es-ES';
   if (voice) u.voice = voice;
   u.rate = 0.95;

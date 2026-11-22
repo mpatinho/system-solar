@@ -1,4 +1,5 @@
 // Progreso guardado en localStorage (siempre protegido con try/catch).
+import { emit } from '../state.js';
 
 const KEY = 'explorador-sistema-solar-v1';
 
@@ -9,6 +10,10 @@ const DEFAULTS = () => ({
   leitner: {},
   wrong: {},
   exams: [],
+  examDate: null, // 'YYYY-MM-DD'
+  daily: { last: null, streak: 0, best: 0, days: {} },
+  games: { asteroids: { best: 0, plays: 0 }, race: {} },
+  hangar: { model: 'caza', paint: 'clasica', flame: 'azul', trail: 'ninguna', seen: [] },
   settings: { version: 2, quality: 'auto', autoTier: null, showFps: false, invertY: false, sound: true, voice: true, orbits: true, labels: true, helpSeen: false, timeScale: 1 },
 });
 
@@ -24,7 +29,9 @@ function load() {
       if (settings.quality === 'alta') settings.quality = 'auto';
       settings.version = 2;
     }
-    return { ...d, ...data, settings };
+    const merged = { ...d, ...data, settings };
+    for (const k of ['daily', 'games', 'hangar']) merged[k] = { ...d[k], ...(data[k] || {}) };
+    return merged;
   } catch {
     return DEFAULTS();
   }
@@ -38,11 +45,12 @@ export function save() {
   } catch {
     /* almacenamiento no disponible: el juego sigue funcionando */
   }
+  emit('progress', progress); // p. ej., para avisar de lo nuevo en el hangar
 }
 
 export function resetProgress() {
   const keepSettings = { ...progress.settings };
-  Object.assign(progress, DEFAULTS(), { settings: keepSettings });
+  Object.assign(progress, DEFAULTS(), { settings: keepSettings, examDate: progress.examDate });
   save();
 }
 
