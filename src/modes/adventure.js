@@ -9,6 +9,7 @@ import { BODY_BY_ID } from '../data/bodies.js';
 import { progress, save, rankFor, pendingWrongIds } from '../utils/storage.js';
 import { pick } from '../utils/pick.js';
 import { dailyStatus } from './daily.js';
+import { createProximityInfo } from './proximity.js';
 import { sfx } from '../utils/audio.js';
 import { state } from '../state.js';
 
@@ -56,6 +57,7 @@ export function createAdventure(game) {
   let phase = 'idle'; // idle | flying | quiz | fly-question
   let mission = null;
   let flyQ = null;
+  const proximity = createProximityInfo(game.info);
 
   const badge = () => {
     const r = rankFor(progress.points);
@@ -229,9 +231,11 @@ export function createAdventure(game) {
       hud.setMode('adventure');
       badge();
       game.info.hide();
+      proximity.reset();
       openBoard();
     },
     exit() {
+      game.info.hide();
       phase = 'idle';
       flyQ = null;
       game.setTarget(null);
@@ -255,6 +259,9 @@ export function createAdventure(game) {
         if (near.inZone && !state.autopilot) hud.setAnswerPrompt(`¿Elegir ${near.entry.body.name}?`, () => answerFly(near.entry.id));
         else hud.setAnswerPrompt(null);
       }
+      // Fichas también en Aventura, salvo durante las preguntas (para no copiar) y al llegar al objetivo de la misión.
+      const asking = phase === 'quiz' || phase === 'fly-question' || (phase === 'flying' && near.entry?.id === mission?.target);
+      if (!state.autopilot) proximity.update(near, { canShow: state.modals === 0, hidden: asking });
     },
   };
 }

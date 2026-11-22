@@ -63,8 +63,9 @@ export function createUiNav(pad) {
       } else {
         main = dir === 'right' ? c.x - fc.x : fc.x - c.x;
         if (main <= 4) continue;
-        cross = Math.max(0, r.top - from.bottom, from.top - r.bottom);
-        if (cross > 0) cross += 40; // en horizontal se prefiere la misma fila
+        // En horizontal, solo dentro de la misma fila (si no, al final de una fila saltaba a la «×» de cerrar).
+        if (r.bottom <= from.top + 4 || r.top >= from.bottom - 4) continue;
+        cross = 0;
       }
       const score = main + cross * 3 + Math.abs(dir === 'down' || dir === 'up' ? c.x - fc.x : c.y - fc.y) * 0.05;
       if (score < bestScore) { bestScore = score; best = el; }
